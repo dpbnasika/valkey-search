@@ -1,6 +1,4 @@
-bazel-*
 __pycache__/
-MODULE.bazel.lock
 resolved_deps.py
 *.swp
 compile_commands.json
@@ -8,6 +6,7 @@ compile_commands.json
 .devcontainer/._devcontainer.json
 .codelite/
 .cache/
-.build-*
+build-*
 *.workspace
-
+build/
+.build-*

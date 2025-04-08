@@ -6,33 +6,38 @@ add_subdirectory(indexes)
 set(SRCS_MODULE_LOADER ${CMAKE_CURRENT_LIST_DIR}/module_loader.cc)
 
 # This is the module target
-valkey_search_add_shared_library(valkeysearch ${SRCS_MODULE_LOADER})
-target_include_directories(valkeysearch PUBLIC ${CMAKE_CURRENT_LIST_DIR})
-target_link_options(valkeysearch PRIVATE "LINKER:--version-script=${CMAKE_SOURCE_DIR}/vmsdk/versionscript.lds")
+valkey_search_add_shared_library(libsearch ${SRCS_MODULE_LOADER})
+target_include_directories(libsearch PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+target_link_options(libsearch PRIVATE "LINKER:--version-script=${CMAKE_SOURCE_DIR}/vmsdk/versionscript.lds")
 
-target_link_libraries(valkeysearch PUBLIC keyspace_event_manager)
-target_link_libraries(valkeysearch PUBLIC valkey_search)
-target_link_libraries(valkeysearch PUBLIC commands)
-target_link_libraries(valkeysearch PUBLIC module)
-target_link_libraries(valkeysearch PUBLIC valkey_module)
-target_link_libraries(valkeysearch PUBLIC server_events)
+target_link_libraries(libsearch PUBLIC keyspace_event_manager)
+target_link_libraries(libsearch PUBLIC valkey_search)
+target_link_libraries(libsearch PUBLIC commands)
+target_link_libraries(libsearch PUBLIC module)
+target_link_libraries(libsearch PUBLIC valkey_module)
+target_link_libraries(libsearch PUBLIC server_events)
 
 list(APPEND THIRD_PARTY_LIBS coordinator_grpc_proto)
 list(APPEND THIRD_PARTY_LIBS coordinator_cc_proto)
 
+valkey_search_create_proto_library("src/rdb_section.proto" "rdb_section_cc_proto")
+target_link_libraries(rdb_section_cc_proto PUBLIC index_schema_cc_proto)
+target_link_libraries(rdb_section_cc_proto PUBLIC coordinator_cc_proto)
+message(STATUS "Created proto library rdb_section_cc_proto")
+
 # Wrap ${THIRD_PARTY_LIBS} with "--start/--end group"
-target_link_options(valkeysearch PRIVATE -Wl,--start-group)
-target_link_libraries(valkeysearch PRIVATE ${THIRD_PARTY_LIBS})
+target_link_options(libsearch PRIVATE -Wl,--start-group)
+target_link_libraries(libsearch PRIVATE ${THIRD_PARTY_LIBS})
 
 # Remove the "lib" prefix from the module
-set_target_properties(valkeysearch PROPERTIES PREFIX "")
+set_target_properties(libsearch PROPERTIES PREFIX "")
 
 if(UNIX AND NOT APPLE)
-  target_link_options(valkeysearch PRIVATE -Wl,--allow-multiple-definition)
+  target_link_options(libsearch PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
 # Append -Wl,--end-group as the LAST argument
-target_link_libraries(valkeysearch PRIVATE lib_to_add_end_group_flag)
+target_link_libraries(libsearch PRIVATE lib_to_add_end_group_flag)
 
 set(SRCS_VALKEY_SEARCH ${CMAKE_CURRENT_LIST_DIR}/valkey_search.cc
                        ${CMAKE_CURRENT_LIST_DIR}/valkey_search.h)
@@ -103,7 +108,7 @@ target_link_libraries(index_schema PUBLIC attribute_data_type)
 target_link_libraries(index_schema PUBLIC index_schema_cc_proto)
 target_link_libraries(index_schema PUBLIC keyspace_event_manager)
 target_link_libraries(index_schema PUBLIC metrics)
-target_link_libraries(index_schema PUBLIC rdb_io_stream)
+target_link_libraries(index_schema PUBLIC rdb_serialization)
 target_link_libraries(index_schema PUBLIC vector_externalizer)
 target_link_libraries(index_schema PUBLIC index_base)
 target_link_libraries(index_schema PUBLIC numeric)
@@ -134,13 +139,15 @@ target_link_libraries(attribute_data_type PUBLIC type_conversions)
 target_link_libraries(attribute_data_type PUBLIC utils)
 target_link_libraries(attribute_data_type PUBLIC valkey_module)
 
-set(SRCS_RDB_IO_STREAM ${CMAKE_CURRENT_LIST_DIR}/rdb_io_stream.h)
+set(SRCS_RDB_SERIALIZATION ${CMAKE_CURRENT_LIST_DIR}/rdb_serialization.cc
+                           ${CMAKE_CURRENT_LIST_DIR}/rdb_serialization.h)
 
-add_library(rdb_io_stream INTERFACE ${SRCS_RDB_IO_STREAM})
-target_include_directories(rdb_io_stream INTERFACE ${CMAKE_CURRENT_LIST_DIR})
-target_link_libraries(rdb_io_stream INTERFACE iostream)
-target_link_libraries(rdb_io_stream INTERFACE managed_pointers)
-target_link_libraries(rdb_io_stream INTERFACE valkey_module)
+valkey_search_add_static_library(rdb_serialization ${SRCS_RDB_SERIALIZATION})
+target_include_directories(rdb_serialization PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+target_link_libraries(rdb_serialization PUBLIC iostream)
+target_link_libraries(rdb_serialization PUBLIC managed_pointers)
+target_link_libraries(rdb_serialization PUBLIC valkey_module)
+target_link_libraries(rdb_serialization PUBLIC rdb_section_cc_proto)
 
 set(SRCS_SCHEMA_MANAGER ${CMAKE_CURRENT_LIST_DIR}/schema_manager.cc
                         ${CMAKE_CURRENT_LIST_DIR}/schema_manager.h)
@@ -150,7 +157,7 @@ target_include_directories(schema_manager PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(schema_manager PUBLIC index_schema)
 target_link_libraries(schema_manager PUBLIC index_schema_cc_proto)
 target_link_libraries(schema_manager PUBLIC metrics)
-target_link_libraries(schema_manager PUBLIC rdb_io_stream)
+target_link_libraries(schema_manager PUBLIC rdb_serialization)
 target_link_libraries(schema_manager PUBLIC vector_externalizer)
 target_link_libraries(schema_manager PUBLIC coordinator_cc_proto)
 target_link_libraries(schema_manager PUBLIC metadata_manager)
